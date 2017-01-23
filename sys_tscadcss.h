@@ -380,10 +380,6 @@ typedef struct {
 
 } sysTscadcss;
 
-//volatile __far sysTscadcss TSCADCSS __attribute((location(0x44E0D000)))
-//#define TSCADCSS (*((volatile sysTscadcss*)0x44E0D000))
-
-volatile __far sysTscadcss TSCADCSS __attribute__((cregister("TSCADCSS", far), peripheral));
-//volatile __far sysTscadcss TSCADCSS __attribute__((cregister("TSCADCSS", far), peripheral));
+#define TSCADCSS (*((volatile sysTscadcss*)0x44E0D000))
 
 #endif /* _SYS_TSCADCSS_H_ */
