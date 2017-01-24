@@ -1,22 +1,101 @@
 /*
- * MIT license (C) 2017
+ * MIT license
  *
+ * Copyright (c) 2017 lore4
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 #ifndef _SYS_TSCADCSS_H_
 #define _SYS_TSCADCSS_H_
+
+struct StepConfig {   // Based on ZMATT structures.
+
+    // sequence config (n/a for idle and charge steps)
+    unsigned continuous : 1;        // 0
+    unsigned hw_sync    : 1;        // 1
+    unsigned averaging  : 3;    // 2-4 log2, max 4 (= 16 samples)
+
+    // analog config (touchscreen transistors)
+    unsigned ch0_p_sw   : 1;  // 5  drive ch 0 (x+) high
+    unsigned ch1_n_sw   : 1;  // 6  drive ch 1 (x-) low
+    unsigned ch2_p_sw   : 1;  // 7  drive ch 2 (y+) high
+    unsigned ch3_n_sw   : 1;  // 8  drive ch 3 (y-) low
+
+    unsigned ch1_p_sw   : 1;  // 9  drive ch 1 (x-) high
+    unsigned ch2_n_sw   : 1;  // 10 drive ch 2 (y+) low
+
+    unsigned ch4_n_sw   : 1;  // 11 drive ch 4 (w) low
+
+    // analog config (analog muxes)
+    unsigned refp_sel   : 3;  // 12-14  vdda, x+, y+, vref+
+    unsigned inm_sel    : 4;  // 15-18  ch0, ..., ch7, vref-
+    unsigned inp_sel    : 4;  // 19-22  ch0, ..., ch7, vref-
+    unsigned refm_sel   : 2;  // 23-24  vssa, x-, y-, vref-
+
+    // analog config (adc config)
+    unsigned en_diff    : 1;  // 25 differential measurement
+
+    // data config (n/a for idle and charge step)
+    unsigned dest_fifo  : 1;    // 26
+    unsigned range_chk  : 1;        // 27
+    unsigned reserved   : 4;        // 28-31    Reserved.
+
+    // relationship between inputs and sample value:
+    //
+    //    sample    single-ended    differential
+    //    0x000 in+ == ref- in+ == ref- && in- == ref+
+    //    0xfff in+ == ref+ in+ == ref+ && in- == ref-
+};
+
+struct StepDelay {
+    unsigned open_delay     : 18;   // 0-17 cycles
+    unsigned reserved       :  6;   // 18-23    Reserved
+    unsigned sample_time    :  8;   // 24-31    cycles - 2
+
+    // Sampling steps consist of:
+    //  open_delay cycles with muxes configured (may be 0)
+    //  2^averaging times
+    //      2 + sample_time cycles of sampling
+    //      13 cycles of conversion
+    //
+    // Charging step only has open_delay, which must be non-zero.
+    //
+    // Idle step lacks this register.
+};
+
+struct Fifo {
+    uint32_t level;      //r-  number of words currently in fifo
+    uint32_t irq_thr;    //rw  irq threshold (= read burst - 1)
+    uint32_t dma_thr;    //rw  dma event threshold (= dma burst - 1)
+};
+
+struct FifoData {
+    union {
+            volatile uint32_t REGISTER;
+            volatile struct {
+                unsigned ADCDATA                                 : 12;    //0-11
+                unsigned RESERVED                                : 4;    //12-15
+                unsigned ADCCHNLID                               : 4;    //16-19
+            } REGISTER_bit;
+        };  // 0x000h
+};
 
 /* SYS_TSCADCSS register set */
 typedef struct {
@@ -24,6 +103,9 @@ typedef struct {
     /***************************/
     /* ADC Subsystem Registers */
     /***************************/
+    // Note: before you disable the ADC, be sure to disable all steps and
+    // wait for the FSM to become idle.  Disabling also resets fifos.
+
     /* SYS_TSCADCSS_REVISION               register bit field */
     union {
         volatile uint32_t REVISION;
@@ -85,13 +167,28 @@ typedef struct {
     /* SYS_TSCADCSS_CTRL                   register bit field */
     union {
         volatile uint32_t CTRL                  ;
-        //volatile struct {} CTRL_bit;
+        volatile struct {
+            unsigned ENABLE                                 : 1;    //0
+            unsigned STEP_ID_TAG                            : 1;    //1
+            unsigned STEPCONFIG_WRITEPROTECT_N_ACTIVE_LOW   : 1;    //2
+            unsigned ADC_BIAS_SEELECT                       : 1;    //3
+            unsigned POWER_DOWN                             : 1;    //4
+            unsigned AFE_PEN_CTRL                           : 2;    //5-6
+            unsigned TOUCH_SCREEN_ENABLE                    : 1;    //7
+            unsigned HW_EVENT_MAPPING                       : 1;    //8
+            unsigned HW_PREEMPT                             : 1;    //9
+        } CTRL_bit;
     };  // 0x040h
 
     /* SYS_TSCADCSS_ADCSTAT                register bit field */
     union {
         volatile uint32_t ADCSTAT               ;
-        //volatile struct {} ADCSTAT_bit;
+        volatile struct {
+            unsigned STEP_ID                                : 5;    // 0-4
+            unsigned FSM_BUSY                               : 1;   // 5
+            unsigned PEN_IRQ0                               : 1;   // 6
+            unsigned PEN_IRQ1                               : 1;   // 7
+        } ADCSTAT_bit;
     };  // 0x044h
 
     /* SYS_TSCADCSS_ADCRANGE               register bit field */
@@ -103,19 +200,40 @@ typedef struct {
     /* SYS_TSCADCSS_ADC_CLKDIV             register bit field */
     union {
         volatile uint32_t ADC_CLKDIV            ;
-        //volatile struct {} ADC_CLKDIV_bit;
+        volatile struct {
+            unsigned ADC_CLKDIV                             : 16;   //0-15
+        } ADC_CLKDIV_bit;
     };  // 0x04Ch
 
     /* SYS_TSCADCSS_ADC_MISC               register bit field */
     union {
-        volatile uint32_t ADC_MISC              ;
+        volatile uint32_t ADC_MISC;
         //volatile struct {} ADC_MISC_bit;
     };  // 0x050h
 
     /* SYS_TSCADCSS_STEPENABLE             register bit field */
     union {
-        volatile uint32_t STEPENABLE            ;
-        //volatile struct {} STEPENABLE_bit;
+        volatile uint32_t STEPENABLE;
+        volatile struct {
+            unsigned TS_CHARGE                              : 1;    //0
+            unsigned STEP1                                  : 1;    //1
+            unsigned STEP2                                  : 1;    //2
+            unsigned STEP3                                  : 1;    //3
+            unsigned STEP4                                  : 1;    //4
+            unsigned STEP5                                  : 1;    //5
+            unsigned STEP6                                  : 1;    //6
+            unsigned STEP7                                  : 1;    //7
+            unsigned STEP8                                  : 1;    //8
+            unsigned STEP9                                  : 1;    //9
+            unsigned STEP10                                 : 1;    //10
+            unsigned STEP11                                 : 1;    //11
+            unsigned STEP12                                 : 1;    //12
+            unsigned STEP13                                 : 1;    //13
+            unsigned STEP14                                 : 1;    //14
+            unsigned STEP15                                 : 1;    //15
+            unsigned STEP16                                 : 1;    //16
+            unsigned reserved                               : 15;   //17-31
+        } STEPENABLE_bit;
     };  // 0x054h
 
     /* SYS_TSCADCSS_IDLECONFIG             register bit field */
@@ -139,37 +257,37 @@ typedef struct {
     /* SYS_TSCADCSS_STEPCONFIG1            register bit field */
     union {
         volatile uint32_t STEPCONFIG1           ;
-        //volatile struct {} STEPCONFIG1_bit;
+        volatile struct StepConfig STEPCONFIG1_bit;
     };  // 0x064h
 
     /* SYS_TSCADCSS_STEPDELAY1             register bit field */
     union {
         volatile uint32_t STEPDELAY1            ;
-        //volatile struct {} STEPDELAY1_bit;
+        volatile struct StepDelay STEPDELAY1_bit;
     };  // 0x068h
 
     /* SYS_TSCADCSS_STEPCONFIG2            register bit field */
     union {
         volatile uint32_t STEPCONFIG2           ;
-        //volatile struct {} STEPCONFIG2_bit;
+        volatile struct StepConfig STEPCONFIG2_bit;
     };  // 0x06Ch
 
     /* SYS_TSCADCSS_STEPDELAY2             register bit field */
     union {
         volatile uint32_t STEPDELAY2            ;
-        //volatile struct {} STEPDELAY2_bit;
+        volatile struct StepDelay STEPDELAY2_bit;
     };  // 0x070h
 
     /* SYS_TSCADCSS_STEPCONFIG3            register bit field */
     union {
         volatile uint32_t STEPCONFIG3           ;
-        //volatile struct {} STEPCONFIG3_bit;
+        volatile struct StepConfig STEPCONFIG3_bit;
     };  // 0x074h
 
     /* SYS_TSCADCSS_STEPDELAY3             register bit field */
     union {
         volatile uint32_t STEPDELAY3            ;
-        //volatile struct {} STEPDELAY3_bit;
+        volatile struct StepDelay STEPDELAY3_bit;
     };  // 0x078h
 
     /* SYS_TSCADCSS_STEPCONFIG4            register bit field */
@@ -331,7 +449,9 @@ typedef struct {
     /* SYS_TSCADCSS_FIFO0COUNT             register bit field */
     union {
         volatile uint32_t FIFO0COUNT            ;
-        //volatile struct {} FIFO0COUNT_bit;
+        volatile struct {
+            unsigned WORDS_IN_FIFO0         : 7;    // 0-6
+        } FIFO0COUNT_bit;
     };  // 0x0E4h
 
     /* SYS_TSCADCSS_FIFO0THRESHOLD         register bit field */
@@ -368,13 +488,13 @@ typedef struct {
 
     /* SYS_TSCADCSS_FIFO0DATA              register bit field */
     union {
-        volatile uint32_t FIFO0DATA             ;
+        volatile struct FifoData FIFO0DATA[64];
         //volatile struct {} FIFO0DATA_bit;
     };  // 0x100h
 
     /* SYS_TSCADCSS_FIFO1DATA              register bit field */
     union {
-        volatile uint32_t FIFO1DATA             ;
+        volatile struct FifoData FIFO1DATA[64];
         //volatile struct {} FIFO1DATA_bit;
     };  // 0x200h
 

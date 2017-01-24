@@ -121,15 +121,64 @@ void main(void)
 			/* Receive all available messages, multiple messages can be sent per kick */
 			while (pru_rpmsg_receive(&transport, &src, &dst, payload, &len) == PRU_RPMSG_SUCCESS) {
 				/* Echo the message back to the same address from which we just received */
-			    //TSCADCSS.IDLECONFIG = 0x11;
-			    uint32_t temp2 = TSCADCSS.ADCSTAT;
 
-			    payload[0] = temp2 & 0x000000FF;
-			    payload[1] = (temp2>>8) & 0x000000FF;
-			    payload[2] = (temp2>>16) & 0x000000FF;
-			    payload[3] = (temp2>>24) & 0x000000FF;
+			    // Retrieve revision value. Default value = 0x47300001.
+			    uint32_t temp2 = TSCADCSS.REVISION;
 
-				pru_rpmsg_send(&transport, dst, src, payload, len);
+			    // Check default value.
+			    if (temp2 == 0x47300001)
+			    {
+
+			        // Configure continous sampling on channel 0.
+			        TSCADCSS.STEPCONFIG1_bit.continuous = 1;
+			        TSCADCSS.STEPCONFIG1_bit.inp_sel = 1;
+			        TSCADCSS.STEPCONFIG1_bit.inm_sel = 9;
+
+			        // Enable sampling on step1 (i.e. channel 0 with continous sampling).
+			        TSCADCSS.STEPENABLE = 2;
+
+			        // Enable sampling.
+			        TSCADCSS.CTRL = 3;
+
+			        // Wait one sample.
+			        if (TSCADCSS.ADCSTAT_bit.FSM_BUSY != 0)
+			        {
+                        while (TSCADCSS.ADCSTAT_bit.FSM_BUSY != 0)
+                        {
+                            // wait.
+                        }
+			        }
+			        // Read data of first element in FIFO.
+			        if (TSCADCSS.FIFO0COUNT_bit.WORDS_IN_FIFO0 != 0)
+			        {
+			            temp2 = TSCADCSS.FIFO0DATA[TSCADCSS.FIFO0COUNT_bit.WORDS_IN_FIFO0-1].REGISTER_bit.ADCDATA;
+			        }
+			        else
+			        {
+			            temp2 = TSCADCSS.FIFO0DATA[0].REGISTER_bit.ADCDATA;
+			        }
+
+			        // Send sample to ARM.
+                    payload[0] = temp2 & 0x000000FF;
+                    payload[1] = (temp2>>8) & 0x000000FF;
+                    payload[2] = (temp2>>16) & 0x000000FF;
+                    payload[3] = (temp2>>24) & 0x000000FF;
+
+                    pru_rpmsg_send(&transport, dst, src, payload, len);
+
+                    // Disable sampling.
+                    TSCADCSS.STEPENABLE = 0;
+
+                    if (TSCADCSS.ADCSTAT_bit.FSM_BUSY != 0)
+                    {
+                        while (TSCADCSS.ADCSTAT_bit.FSM_BUSY != 0)
+                        {
+                            ;
+                        }
+                    }
+
+                    TSCADCSS.CTRL = 0;
+			    }
 			}
 		}
 	}
