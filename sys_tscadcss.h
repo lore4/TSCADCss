@@ -28,8 +28,8 @@
 struct StepConfig {   // Based on ZMATT structures.
 
     // sequence config (n/a for idle and charge steps)
-    unsigned continuous : 1;        // 0
-    unsigned hw_sync    : 1;        // 1
+    unsigned continuous : 1;    // 0
+    unsigned hw_sync    : 1;    // 1
     unsigned averaging  : 3;    // 2-4 log2, max 4 (= 16 samples)
 
     // analog config (touchscreen transistors)
@@ -55,13 +55,13 @@ struct StepConfig {   // Based on ZMATT structures.
     // data config (n/a for idle and charge step)
     unsigned dest_fifo  : 1;    // 26
     unsigned range_chk  : 1;        // 27
-    unsigned reserved   : 4;        // 28-31    Reserved.
+    unsigned reserved28_31   : 4;        // 28-31    Reserved.
 
     // relationship between inputs and sample value:
     //
     //    sample    single-ended    differential
-    //    0x000 in+ == ref- in+ == ref- && in- == ref+
-    //    0xfff in+ == ref+ in+ == ref+ && in- == ref-
+    //    0x000     in+ == ref-     in+ == ref- && in- == ref+
+    //    0xfff     in+ == ref+     in+ == ref+ && in- == ref-
 };
 
 struct StepDelay {
@@ -90,9 +90,10 @@ struct FifoData {
     union {
             volatile uint32_t REGISTER;
             volatile struct {
-                unsigned ADCDATA                                 : 12;    //0-11
-                unsigned RESERVED                                : 4;    //12-15
-                unsigned ADCCHNLID                               : 4;    //16-19
+                unsigned ADCDATA                                 : 12;  //0-11
+                unsigned reserved12_15                           : 4;   //12-15
+                unsigned ADCCHNLID                               : 4;   //16-19
+                unsigned reserved20_31                           : 12;  //20-31
             } REGISTER_bit;
         };  // 0x000h
 };
@@ -125,7 +126,20 @@ typedef struct {
     /* SYS_TSCADCSS_IRQSTATUS_RAW          register bit field */
     union {
         volatile uint32_t IRQSTATUS_RAW;
-        //volatile struct {} IRQSTATUS_RAW_bit;
+        volatile struct {
+            unsigned HW_PEN_EVENT_ASYNCHRONOUS  : 1; // 0
+            unsigned END_OF_SEQUENCE            : 1; // 1
+            unsigned FIFO0_THRESHOLD            : 1; // 2
+            unsigned FIFO0_OVERRUN              : 1; // 3
+            unsigned FIFO0_UNDERFLOW            : 1; // 4
+            unsigned FIFO1_THRESHOLD            : 1; // 5
+            unsigned FIFO2_OVERRUN              : 1; // 6
+            unsigned FIFO3_UNDERFLOW            : 1; // 7
+            unsigned OUT_OF_RANGE               : 1; // 8
+            unsigned PEN_UP_EVENT               : 1; // 9
+            unsigned HW_PEN_EVENT_SYNCHRONOUS   : 1; // 10
+            unsigned reserved21                 : 21; // 11-31
+        } IRQSTATUS_RAW_bit;
     };  // 0x024h
 
     /* SYS_TSCADCSS_IRQSTATUS              register bit field */
@@ -137,7 +151,20 @@ typedef struct {
     /* SYS_TSCADCSS_IRQENABLE_SET          register bit field */
     union {
         volatile uint32_t IRQENABLE_SET;
-        //volatile struct {} IRQENABLE_SET_bit;
+        volatile struct {
+            unsigned HW_PEN_EVENT_ASYNCHRONOUS  : 1; // 0
+            unsigned END_OF_SEQUENCE            : 1; // 1
+            unsigned FIFO0_THRESHOLD            : 1; // 2
+            unsigned FIFO0_OVERRUN              : 1; // 3
+            unsigned FIFO0_UNDERFLOW            : 1; // 4
+            unsigned FIFO1_THRESHOLD            : 1; // 5
+            unsigned FIFO2_OVERRUN              : 1; // 6
+            unsigned FIFO3_UNDERFLOW            : 1; // 7
+            unsigned OUT_OF_RANGE               : 1; // 8
+            unsigned PEN_UP_EVENT               : 1; // 9
+            unsigned HW_PEN_EVENT_SYNCHRONOUS   : 1; // 10
+            unsigned reserved21                 : 21; // 11-31
+        } IRQENABLE_SET_bit;
     };  // 0x02Ch
 
     /* SYS_TSCADCSS_IRQENABLE_CLR          register bit field */
@@ -177,6 +204,7 @@ typedef struct {
             unsigned TOUCH_SCREEN_ENABLE                    : 1;    //7
             unsigned HW_EVENT_MAPPING                       : 1;    //8
             unsigned HW_PREEMPT                             : 1;    //9
+            unsigned reserved10_31                          : 1;    //10-31
         } CTRL_bit;
     };  // 0x040h
 
@@ -202,6 +230,7 @@ typedef struct {
         volatile uint32_t ADC_CLKDIV            ;
         volatile struct {
             unsigned ADC_CLKDIV                             : 16;   //0-15
+            unsigned reserved16_31                          : 16;   //16-31
         } ADC_CLKDIV_bit;
     };  // 0x04Ch
 
@@ -232,7 +261,7 @@ typedef struct {
             unsigned STEP14                                 : 1;    //14
             unsigned STEP15                                 : 1;    //15
             unsigned STEP16                                 : 1;    //16
-            unsigned reserved                               : 15;   //17-31
+            unsigned reserved17_31                          : 15;   //17-31
         } STEPENABLE_bit;
     };  // 0x054h
 
@@ -293,157 +322,157 @@ typedef struct {
     /* SYS_TSCADCSS_STEPCONFIG4            register bit field */
     union {
         volatile uint32_t STEPCONFIG4           ;
-        //volatile struct {} STEPCONFIG4_bit;
+        volatile struct StepConfig STEPCONFIG4_bit;
     };  // 0x07Ch
 
     /* SYS_TSCADCSS_STEPDELAY4             register bit field */
     union {
         volatile uint32_t STEPDELAY4            ;
-        //volatile struct {} STEPDELAY4_bit;
+        volatile struct StepDelay STEPDELAY4_bit;
     };  // 0x080h
 
     /* SYS_TSCADCSS_STEPCONFIG5            register bit field */
     union {
         volatile uint32_t STEPCONFIG5           ;
-        //volatile struct {} STEPCONFIG5_bit;
+        volatile struct StepConfig STEPCONFIG5_bit;
     };  // 0x084h
 
     /* SYS_TSCADCSS_STEPDELAY5             register bit field */
     union {
         volatile uint32_t STEPDELAY5            ;
-        //volatile struct {} STEPDELAY5_bit;
+        volatile struct StepDelay STEPDELAY5_bit;
     };  // 0x088h
 
     /* SYS_TSCADCSS_STEPCONFIG6            register bit field */
     union {
         volatile uint32_t STEPCONFIG6           ;
-        //volatile struct {} STEPCONFIG6_bit;
+        volatile struct StepConfig STEPCONFIG6_bit;
     };  // 0x08Ch
 
     /* SYS_TSCADCSS_STEPDELAY6             register bit field */
     union {
         volatile uint32_t STEPDELAY6            ;
-        //volatile struct {} STEPDELAY6_bit;
+        volatile struct StepDelay STEPDELAY6_bit;
     };  // 0x090h
 
     /* SYS_TSCADCSS_STEPCONFIG7            register bit field */
     union {
         volatile uint32_t STEPCONFIG7           ;
-        //volatile struct {} STEPCONFIG7_bit;
+        volatile struct StepConfig STEPCONFIG7_bit;
     };  // 0x094h
 
     /* SYS_TSCADCSS_STEPDELAY7             register bit field */
     union {
         volatile uint32_t STEPDELAY7            ;
-        //volatile struct {} STEPDELAY7_bit;
+        volatile struct StepDelay STEPDELAY7_bit;
     };  // 0x098h
 
     /* SYS_TSCADCSS_STEPCONFIG8            register bit field */
     union {
         volatile uint32_t STEPCONFIG8           ;
-        //volatile struct {} STEPCONFIG8_bit;
+        volatile struct StepConfig STEPCONFIG8_bit;
     };  // 0x09Ch
 
     /* SYS_TSCADCSS_STEPDELAY8             register bit field */
     union {
         volatile uint32_t STEPDELAY8            ;
-        //volatile struct {} STEPDELAY8_bit;
+        volatile struct StepDelay STEPDELAY8_bit;
     };  // 0x0A0h
 
     /* SYS_TSCADCSS_STEPCONFIG9            register bit field */
     union {
         volatile uint32_t STEPCONFIG9           ;
-        //volatile struct {} STEPCONFIG9_bit;
+        volatile struct StepConfig STEPCONFIG9_bit;
     };  // 0x0A4h
 
     /* SYS_TSCADCSS_STEPDELAY9             register bit field */
     union {
         volatile uint32_t STEPDELAY9            ;
-        //volatile struct {} STEPDELAY9_bit;
+        volatile struct StepDelay STEPDELAY9_bit;
     };  // 0x0A8h
 
     /* SYS_TSCADCSS_STEPCONFIG10           register bit field */
     union {
         volatile uint32_t STEPCONFIG10          ;
-        //volatile struct {} STEPCONFIG10_bit;
+        volatile struct StepConfig STEPCONFIG10_bit;
     };  // 0x0ACh
 
     /* SYS_TSCADCSS_STEPDELAY10            register bit field */
     union {
         volatile uint32_t STEPDELAY10           ;
-        //volatile struct {} STEPDELAY10_bit;
+        volatile struct StepDelay STEPDELAY10_bit;
     };  // 0x0B0h
 
     /* SYS_TSCADCSS_STEPCONFIG11           register bit field */
     union {
         volatile uint32_t STEPCONFIG11          ;
-        //volatile struct {} STEPCONFIG11_bit;
+        volatile struct StepConfig STEPCONFIG11_bit;
     };  // 0x0B4h
 
     /* SYS_TSCADCSS_STEPDELAY11            register bit field */
     union {
         volatile uint32_t STEPDELAY11           ;
-        //volatile struct {} STEPDELAY11_bit;
+        volatile struct StepDelay STEPDELAY11_bit;
     };  // 0x0B8h
 
     /* SYS_TSCADCSS_STEPCONFIG12           register bit field */
     union {
         volatile uint32_t STEPCONFIG12          ;
-        //volatile struct {} STEPCONFIG12_bit;
+        volatile struct StepConfig STEPCONFIG12_bit;
     };  // 0x0BCh
 
     /* SYS_TSCADCSS_STEPDELAY12            register bit field */
     union {
         volatile uint32_t STEPDELAY12           ;
-        //volatile struct {} STEPDELAY12_bit;
+        volatile struct StepDelay STEPDELAY12_bit;
     };  // 0x0C0h
 
     /* SYS_TSCADCSS_STEPCONFIG13           register bit field */
     union {
         volatile uint32_t STEPCONFIG13          ;
-        //volatile struct {} STEPCONFIG13_bit;
+        volatile struct StepConfig STEPCONFIG13_bit;
     };  // 0x0C4h
 
     /* SYS_TSCADCSS_STEPDELAY13            register bit field */
     union {
         volatile uint32_t STEPDELAY13           ;
-        //volatile struct {} STEPDELAY13_bit;
+        volatile struct StepDelay STEPDELAY13_bit;
     };  // 0x0C8h
 
     /* SYS_TSCADCSS_STEPCONFIG14           register bit field */
     union {
         volatile uint32_t STEPCONFIG14          ;
-        //volatile struct {} STEPCONFIG14_bit;
+        volatile struct StepConfig STEPCONFIG14_bit;
     };  // 0x0CCh
 
     /* SYS_TSCADCSS_STEPDELAY14            register bit field */
     union {
         volatile uint32_t STEPDELAY14           ;
-        //volatile struct {} STEPDELAY14_bit;
+        volatile struct StepDelay STEPDELAY14_bit;
     };  // 0x0D0h
 
     /* SYS_TSCADCSS_STEPCONFIG15           register bit field */
     union {
         volatile uint32_t STEPCONFIG15          ;
-        //volatile struct {} STEPCONFIG15_bit;
+        volatile struct StepConfig STEPCONFIG15_bit;
     };  // 0x0D4h
 
     /* SYS_TSCADCSS_STEPDELAY15            register bit field */
     union {
         volatile uint32_t STEPDELAY15           ;
-        //volatile struct {} STEPDELAY15_bit;
+        volatile struct StepDelay STEPDELAY15_bit;
     };  // 0x0D8h
 
     /* SYS_TSCADCSS_STEPCONFIG16           register bit field */
     union {
         volatile uint32_t STEPCONFIG16          ;
-        //volatile struct {} STEPCONFIG16_bit;
+        volatile struct StepConfig STEPCONFIG16_bit;
     };  // 0x0DCh
 
     /* SYS_TSCADCSS_STEPDELAY16            register bit field */
     union {
         volatile uint32_t STEPDELAY16           ;
-        //volatile struct {} STEPDELAY16_bit;
+        volatile struct StepDelay STEPDELAY16_bit;
     };  // 0x0E0h
 
     /* SYS_TSCADCSS_FIFO0COUNT             register bit field */
@@ -451,6 +480,7 @@ typedef struct {
         volatile uint32_t FIFO0COUNT            ;
         volatile struct {
             unsigned WORDS_IN_FIFO0         : 7;    // 0-6
+            unsigned reserved7_31           : 25;   // 7-31
         } FIFO0COUNT_bit;
     };  // 0x0E4h
 
@@ -484,22 +514,24 @@ typedef struct {
         //volatile struct {} DMA1REQ_bit;
     };  // 0x0F8h
 
-    uint32_t rsvdFC[2];        // 0x0FC - 0x100
+    uint32_t rsvdFC[1];        // 0x0FC - 0x100
 
     /* SYS_TSCADCSS_FIFO0DATA              register bit field */
     union {
-        volatile struct FifoData FIFO0DATA[64];
+        volatile struct FifoData FIFO0DATA[64]; // Ignore index as the port returns the oldest sample.
         //volatile struct {} FIFO0DATA_bit;
     };  // 0x100h
 
     /* SYS_TSCADCSS_FIFO1DATA              register bit field */
     union {
-        volatile struct FifoData FIFO1DATA[64];
+        volatile struct FifoData FIFO1DATA[64]; // Ignore index as the port returns the oldest sample.
         //volatile struct {} FIFO1DATA_bit;
     };  // 0x200h
 
 } sysTscadcss;
 
 #define TSCADCSS (*((volatile sysTscadcss*)0x44E0D000))
+
+#define ADCPRCM (*((volatile uint32_t*)0x44E004BC))
 
 #endif /* _SYS_TSCADCSS_H_ */
