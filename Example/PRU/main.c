@@ -1,4 +1,7 @@
 /*
+ * Copyright (C) 2017 Lore4 - MIT License.
+ *
+ * Example based on lab 5 example from TI which has:
  * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com/
  *
  *
@@ -50,7 +53,7 @@ volatile register uint32_t __R31;
  * PRU1 uses system event 18 (To ARM) and 19 (From ARM)
  */
 #define TO_ARM_HOST			18	
-#define FROM_ARM_HOST			19
+#define FROM_ARM_HOST	    19
 
 /*
  * Using the name 'rpmsg-client-sample' will probe the RPMsg sample driver
@@ -72,22 +75,6 @@ volatile register uint32_t __R31;
 #define VIRTIO_CONFIG_S_DRIVER_OK	4
 
 uint8_t payload[RPMSG_BUF_SIZE];
-
-/*
- * ADC defines.
- */
-#define ADC_BASE 0x44e0d000
-
-#define CONTROL 0x0040
-#define SPEED   0x004c
-#define STEP1   0x0064
-#define DELAY1  0x0068
-#define STATUS  0x0044
-#define STEPCONFIG  0x0054
-#define FIFO0COUNT  0x00e4
-
-#define ADC_FIFO0DATA   (ADC_BASE + 0x0100)
-
 
 /*
  * main.c
@@ -113,72 +100,169 @@ void main(void)
 
 	/* Create the RPMsg channel between the PRU and ARM user space using the transport structure. */
 	while (pru_rpmsg_channel(RPMSG_NS_CREATE, &transport, CHAN_NAME, CHAN_DESC, CHAN_PORT) != PRU_RPMSG_SUCCESS);
+
 	while (1) {
 		/* Check bit 30 of register R31 to see if the ARM has kicked us */
 		if (__R31 & HOST_INT) {
 			/* Clear the event status */
 			CT_INTC.SICR_bit.STS_CLR_IDX = FROM_ARM_HOST;
+
 			/* Receive all available messages, multiple messages can be sent per kick */
 			while (pru_rpmsg_receive(&transport, &src, &dst, payload, &len) == PRU_RPMSG_SUCCESS) {
 				/* Echo the message back to the same address from which we just received */
 
-			    // Retrieve revision value. Default value = 0x47300001.
-			    uint32_t temp2 = TSCADCSS.REVISION;
+			    /////////////////////////////////////////
+			    //  Init ADC
+			    /////////////////////////////////////////
+
+			    // Fifo elements counter.
+                uint32_t fifoCount = 0;
+                // Channel Id container.
+                uint32_t stepId = TSCADCSS.REVISION; // Retrieve revision value. Default value = 0x47300001.
+                // Define sample container.
+                uint32_t channelSample = 0;
+                // Enable Channel ID and Write on stepconfigs.
+                TSCADCSS.CTRL = 6;
+
+                TSCADCSS.ADC_CLKDIV = 1999;     // Divide default ADC frequency by 2000 (i.e. 1999 + 1).
+                                                // Note: at high frequencies samples may be incorrect.
+
+                // Enable ADC Steps.
+                TSCADCSS.STEPCONFIG1_bit.inp_sel = 0;
+                TSCADCSS.STEPCONFIG2_bit.inp_sel = 1;
+                TSCADCSS.STEPCONFIG3_bit.inp_sel = 2;
+                TSCADCSS.STEPCONFIG4_bit.inp_sel = 3;
+                TSCADCSS.STEPCONFIG5_bit.inp_sel = 4;
+                TSCADCSS.STEPCONFIG6_bit.inp_sel = 5;
+                TSCADCSS.STEPCONFIG7_bit.inp_sel = 6;
+                TSCADCSS.STEPCONFIG8_bit.inp_sel = 7;
+
+                TSCADCSS.STEPCONFIG1_bit.inm_sel = 0;
+                TSCADCSS.STEPCONFIG2_bit.inm_sel = 0;
+                TSCADCSS.STEPCONFIG3_bit.inm_sel = 0;
+                TSCADCSS.STEPCONFIG4_bit.inm_sel = 0;
+                TSCADCSS.STEPCONFIG5_bit.inm_sel = 0;
+                TSCADCSS.STEPCONFIG6_bit.inm_sel = 0;
+                TSCADCSS.STEPCONFIG7_bit.inm_sel = 0;
+                TSCADCSS.STEPCONFIG8_bit.inm_sel = 0;
+
+                TSCADCSS.STEPCONFIG1_bit.en_diff = 0;
+                TSCADCSS.STEPCONFIG2_bit.en_diff = 0;
+                TSCADCSS.STEPCONFIG3_bit.en_diff = 0;
+                TSCADCSS.STEPCONFIG4_bit.en_diff = 0;
+                TSCADCSS.STEPCONFIG5_bit.en_diff = 0;
+                TSCADCSS.STEPCONFIG6_bit.en_diff = 0;
+                TSCADCSS.STEPCONFIG7_bit.en_diff = 0;
+                TSCADCSS.STEPCONFIG8_bit.en_diff = 0;
+
+                TSCADCSS.STEPCONFIG1_bit.averaging = 4;
+                TSCADCSS.STEPCONFIG2_bit.averaging = 4;
+                TSCADCSS.STEPCONFIG3_bit.averaging = 4;
+                TSCADCSS.STEPCONFIG4_bit.averaging = 4;
+                TSCADCSS.STEPCONFIG5_bit.averaging = 4;
+                TSCADCSS.STEPCONFIG6_bit.averaging = 4;
+                TSCADCSS.STEPCONFIG7_bit.averaging = 4;
+                TSCADCSS.STEPCONFIG8_bit.averaging = 4;
+
+                // Configure step1 delay.
+                TSCADCSS.STEPDELAY1 = 0;
+//                TSCADCSS.STEPDELAY2 = 0;
+//                TSCADCSS.STEPDELAY3 = 0;
+//                TSCADCSS.STEPDELAY4 = 0;
+//                TSCADCSS.STEPDELAY5 = 0;
+//                TSCADCSS.STEPDELAY6 = 0;
+//                TSCADCSS.STEPDELAY7 = 0;
+//                TSCADCSS.STEPDELAY8 = 0;
+
+                // Enable sampling on step1 (i.e. channel 0 sampling).
+                TSCADCSS.STEPENABLE_bit.STEP1 = 1;
+//                TSCADCSS.STEPENABLE_bit.STEP2 = 1;
+//                TSCADCSS.STEPENABLE_bit.STEP3 = 1;
+//                TSCADCSS.STEPENABLE_bit.STEP4 = 1;
+//                TSCADCSS.STEPENABLE_bit.STEP5 = 1;
+//                TSCADCSS.STEPENABLE_bit.STEP6 = 1;
+//                TSCADCSS.STEPENABLE_bit.STEP7 = 1;
+//                TSCADCSS.STEPENABLE_bit.STEP8 = 1;
+
+                // Enable sampling.
+                TSCADCSS.CTRL = 7;
+
+                // Prepare message index.
+                uint8_t payloadOffset = 4;   // Get current position of payload in message.
 
 			    // Check default value.
-			    if (temp2 == 0x47300001)
+			    if (stepId == 0x47300001)
 			    {
+                    struct FifoData currentFifoElement;
+                    uint32_t sampleId = 0;
 
-			        // Configure continous sampling on channel 0.
-			        TSCADCSS.STEPCONFIG1_bit.continuous = 1;
-			        TSCADCSS.STEPCONFIG1_bit.inp_sel = 1;
-			        TSCADCSS.STEPCONFIG1_bit.inm_sel = 9;
+                    __delay_cycles(20000000);  // wait (10000 * 200Mhz).
 
-			        // Enable sampling on step1 (i.e. channel 0 with continous sampling).
-			        TSCADCSS.STEPENABLE = 2;
-
-			        // Enable sampling.
-			        TSCADCSS.CTRL = 3;
-
-			        // Wait one sample.
-			        if (TSCADCSS.ADCSTAT_bit.FSM_BUSY != 0)
+			        while (fifoCount < 1)
 			        {
-                        while (TSCADCSS.ADCSTAT_bit.FSM_BUSY != 0)
-                        {
-                            // wait.
-                        }
-			        }
-			        // Read data of first element in FIFO.
-			        if (TSCADCSS.FIFO0COUNT_bit.WORDS_IN_FIFO0 != 0)
-			        {
-			            temp2 = TSCADCSS.FIFO0DATA[TSCADCSS.FIFO0COUNT_bit.WORDS_IN_FIFO0-1].REGISTER_bit.ADCDATA;
-			        }
-			        else
-			        {
-			            temp2 = TSCADCSS.FIFO0DATA[0].REGISTER_bit.ADCDATA;
+			            fifoCount = TSCADCSS.FIFO0COUNT;
 			        }
 
-			        // Send sample to ARM.
-                    payload[0] = temp2 & 0x000000FF;
-                    payload[1] = (temp2>>8) & 0x000000FF;
-                    payload[2] = (temp2>>16) & 0x000000FF;
-                    payload[3] = (temp2>>24) & 0x000000FF;
+			        // Update message header with the number of samples.
+			        payload[0] = (fifoCount) & 0x000000FF;    // Update payload with # of samples.
+                    payload[1] = (fifoCount>>8) & 0x000000FF;
+                    payload[2] = (fifoCount>>16) & 0x000000FF;
+                    payload[3] = (fifoCount>>24) & 0x000000FF;
 
-                    pru_rpmsg_send(&transport, dst, src, payload, len);
+			        for (sampleId = 0; sampleId < fifoCount; sampleId++)
+			        {
+                        // Retrieve data.
+                        currentFifoElement = TSCADCSS.FIFO0DATA[0];
+                        stepId = currentFifoElement.REGISTER_bit.ADCCHNLID + 1;      // Retrieve sample step ID.
 
-                    // Disable sampling.
-                    TSCADCSS.STEPENABLE = 0;
+//                        channelSample = currentFifoElement.REGISTER_bit.ADCDATA;    // Retrieve sample value (easy way).
+                        channelSample = currentFifoElement.REGISTER;                // Retrieve sample value (hard way).
+                        channelSample &= 0x00000fff;
 
-                    if (TSCADCSS.ADCSTAT_bit.FSM_BUSY != 0)
-                    {
-                        while (TSCADCSS.ADCSTAT_bit.FSM_BUSY != 0)
-                        {
-                            ;
-                        }
+                        // Prepare sample for ARM (hardway).
+                        uint32_t commodoChannelSample = channelSample;
+                        payload[payloadOffset] = channelSample & 0x000000FF;
+                        commodoChannelSample = commodoChannelSample >> 8;
+                        payload[payloadOffset + 1] = commodoChannelSample & 0x000000FF;
+                        commodoChannelSample = commodoChannelSample >> 8;
+                        payload[payloadOffset + 2] = commodoChannelSample & 0x000000FF;
+                        commodoChannelSample = commodoChannelSample >> 8;
+                        payload[payloadOffset + 3] = commodoChannelSample & 0x000000FF;
+
+                        payload[payloadOffset + 4] = stepId & 0x000000FF;
+                        payload[payloadOffset + 5] = (stepId>>8) & 0x000000FF;
+                        payload[payloadOffset + 6] = (stepId>>16) & 0x000000FF;
+                        payload[payloadOffset + 7] = (stepId>>24) & 0x000000FF;
+
+                        payloadOffset += 8;
                     }
 
-                    TSCADCSS.CTRL = 0;
 			    }
+
+                pru_rpmsg_send(&transport, dst, src, payload, payloadOffset );// len);
+
+                /////////////////////////////////////////
+                //  Release ADC
+                /////////////////////////////////////////
+                // Disable sampling.
+                TSCADCSS.STEPENABLE = 0;
+
+                // Empty fifo.
+                while (TSCADCSS.FIFO0COUNT_bit.WORDS_IN_FIFO0 != 0)//(TSCADCSS.ADCSTAT_bit.FSM_BUSY != 0)
+                {
+                    channelSample = TSCADCSS.FIFO0DATA[TSCADCSS.FIFO0COUNT_bit.WORDS_IN_FIFO0-1].REGISTER_bit.ADCDATA;
+                }
+
+                // Wait until ADC's FSM has finished, otherwise there are issues with ADC.
+                if (TSCADCSS.ADCSTAT_bit.FSM_BUSY != 0)
+                {
+                    while (TSCADCSS.ADCSTAT_bit.FSM_BUSY != 0)
+                    {
+                        ;
+                    }
+                }
+
+                TSCADCSS.CTRL = 6;
 			}
 		}
 	}
